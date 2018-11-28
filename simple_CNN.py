@@ -6,12 +6,13 @@ from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
+from keras import optimizers
 from sklearn.metrics import classification_report, confusion_matrix
 import os, os.path
 import tkinter as tk
 from tkinter import filedialog
 import pandas as pd  
-
+import matplotlib.pyplot as plt 
 
 def get_time():
     current_time = ''
@@ -57,7 +58,9 @@ def create_CNN_model(data_dir):
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
     #Compiling the model.
+    #sgd = optimizers.SGD(lr=0.01, momentum=0.0, decay=0.0, nesterov=False)
     model.compile(loss='binary_crossentropy',
+                  #optimizer=sgd,
                   optimizer='adam', #changed from rmsprop to adam
                   metrics=['accuracy'])
     
@@ -66,7 +69,7 @@ def create_CNN_model(data_dir):
     #test_data_dir = data_dir+'/test'
     nb_train_samples = sum([len(files) for r, d, files in os.walk(train_data_dir)])
     nb_validation_samples = sum([len(files) for r, d, files in os.walk(validation_data_dir)])
-    epochs = 2
+    epochs = 10
     batch_size = 25
     # this is the augmentation configuration we will use for training
     train_datagen = ImageDataGenerator(
@@ -97,9 +100,9 @@ def create_CNN_model(data_dir):
         validation_steps=nb_validation_samples // batch_size)
     
     #print(hist.history)
-    model.save('first_model.h5')
-    model.save_weights('first_try.h5')
-    return hist, model, validation_generator
+    #model.save('first_model.h5')
+    #model.save_weights('first_try.h5')
+    return hist, model, validation_generator, epochs
 
 
 def evaluate_CNN(hist, model, validation_generator):   
@@ -139,14 +142,22 @@ def cal_acc(hist):
     return accuracy
 
 
-def save_results(accuracy, validation_generator, predictions, results_path):
-    #Make directory for results
-    current_time = get_time()
-    training_results = results_path+'training_results'+"_"+current_time
-    os.makedirs(training_results)
-    
+def plot_acc(training_results, hist, epochs):
+    plt.plot(hist.history['acc'])
+    plt.plot(hist.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.xlim(0, epochs-1) 
+    plt.legend(['train', 'test'], loc='upper left')
+    #It is very important to have savefig() before show().
+    plt.savefig(training_results+'accuracy.png')
+    plt.show()
+
+
+def save_results(accuracy, validation_generator, predictions, training_results):
     #Accuracy metrics
-    f_accuracy = open(training_results + "\\"+"accuracy"+".csv","w")
+    f_accuracy = open(training_results+"accuracy"+".csv","w")
     accuracy.to_csv(f_accuracy, index=False)
     f_accuracy.close()
     
@@ -155,14 +166,14 @@ def save_results(accuracy, validation_generator, predictions, results_path):
     class_labels = list(validation_generator.class_indices.keys())
     matrix = confusion_matrix(true_classes, predictions)
     #print(matrix)
-    f_confusion_matrix = open(training_results + "\\"+"confusion-matrix"+".csv",'w')
+    f_confusion_matrix = open(training_results+"confusion-matrix"+".csv",'w')
     f_confusion_matrix.write(np.array2string(matrix, separator=', '))
     f_confusion_matrix.close()
     
     #Results
     result = classification_report(true_classes, predictions, target_names=class_labels)
     #print(result) 
-    f_report = open(training_results + "\\"+"report"+".rtf","w")
+    f_report = open(training_results+"report"+".rtf","w")
     f_report.write(result)
     f_report.close()
 
@@ -173,14 +184,21 @@ def main():
     print("Process started")
     print("---------------")
     results_path = ('C:\\Users\\svissa1\\Documents\\research\\results\\training\\')
+    #Make directory for results
+    current_time = get_time()
+    training_results = results_path+'training_results'+"_"+current_time+ "\\"
+    os.makedirs(training_results)
     #Gets the input directory.
     data_dir = get_input_dir()
+    print("data_dir: "+data_dir)
     #Creates the model and saves it.
-    hist, model, validation_generator = create_CNN_model(data_dir)
+    hist, model, validation_generator, epochs = create_CNN_model(data_dir)
     #Evaluates the created model.
     predictions, accuracy = evaluate_CNN(hist, model, validation_generator)
+    #Plots the model accuracies.
+    plot_acc(training_results, hist, epochs)
     #Saves the results in appropriate files.
-    save_results(accuracy, validation_generator, predictions, results_path)
+    save_results(accuracy, validation_generator, predictions, training_results)
 
     endtime = time.clock()
     timeElapsed = endtime - startTime
