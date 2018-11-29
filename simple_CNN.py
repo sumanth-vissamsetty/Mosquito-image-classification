@@ -149,7 +149,7 @@ def plot_acc(training_results, hist, epochs):
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
     plt.xlim(0, epochs-1) 
-    plt.legend(['train', 'test'], loc='upper left')
+    plt.legend(['train', 'validation'], loc='upper left')
     #It is very important to have savefig() before show().
     plt.savefig(training_results+'accuracy.png')
     plt.show()
