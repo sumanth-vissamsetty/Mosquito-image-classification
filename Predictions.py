@@ -21,7 +21,9 @@ print("---------------")
 root = tk.Tk()
 root.withdraw()
 
-results_path = ('C:\\Users\\svissa1\\Documents\\research\\results\\testing\\')
+#Updated use file dialogue
+results_path = filedialog.askdirectory(parent=root,initialdir="//",title='Pick the directory to save the results')
+#results_path = ('C:\\Users\\svissa1\\Documents\\research\\results\\testing\\')
 predicted_results = results_path+'predicted_images'+"_"+strTime
 os.makedirs(predicted_results)
 predictions_csvfile = open(predicted_results + "\\" + "predictions"+".csv","w")
@@ -30,6 +32,7 @@ model_dir = filedialog.askdirectory(parent=root,initialdir="//",title='Pick the 
 data_dir = filedialog.askdirectory(parent=root,initialdir="//",title='Pick the directory containing data')
 train_data_dir = data_dir+'/train'
 test_data_dir = data_dir+'/test'
+# If you want to predict on new images put them in the test data. 
 
 #Processing time starts
 startTime = time.clock()
@@ -91,6 +94,8 @@ predictions_csvfile.close()
 classes = train_generator.class_indices.keys() #Instar4, Pupae
 for folder in classes:
     os.makedirs(predicted_results+'/'+folder)
+
+#Change the following into something more general. 
 
 #Copying the predcited images to resepective labelled-folders.
 for a in results.values:
