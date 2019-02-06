@@ -7,19 +7,11 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
 from keras import backend as K
 from keras import optimizers
-from sklearn.metrics import classification_report, confusion_matrix
 import os, os.path
 import tkinter as tk
 from tkinter import filedialog
 import pandas as pd  
 import matplotlib.pyplot as plt 
-
-def get_time():
-    current_time = ''
-    for i in range(6):
-        current_time = current_time + str(time.localtime()[i])+'_'
-    current_time = current_time[:len(current_time)-1]
-    return current_time
 
 
 def get_input_dir():    
@@ -29,39 +21,41 @@ def get_input_dir():
     return data_dir
 
 
-def create_CNN_model(data_dir): 
+def create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_nodes,if_third_layer,opt,results_path): 
     # dimensions of our images.
-    img_width, img_height = 150, 150
+    img_width, img_height = 200, 200
     if K.image_data_format() == 'channels_first':
         input_shape = (3, img_width, img_height)
     else:
         input_shape = (img_width, img_height, 3)
     #Creating the model.
     model = Sequential()
+    
     #Adding layers to the model.
-    model.add(Conv2D(32, (3, 3), input_shape=input_shape)) 
+    model.add(Conv2D(first_layer_nodes, (3, 3), input_shape=input_shape)) 
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     
-    model.add(Conv2D(32, (3, 3)))
+    model.add(Conv2D(second_layer_nodes, (3, 3)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     
-    model.add(Conv2D(64, (3, 3)))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    if if_third_layer == 'T':     
+        model.add(Conv2D(third_layer_nodes, (3, 3)))
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
     
     model.add(Flatten())
-    model.add(Dense(64))
-    model.add(Activation('relu'))
+    model.add(Dense(16))
+    model.add(Activation('relu')) 
     model.add(Dropout(0.5))
     model.add(Dense(1))
-    model.add(Activation('sigmoid'))
+    model.add(Activation('sigmoid')) 
     #Compiling the model.
     #sgd = optimizers.SGD(lr=0.01, momentum=0.0, decay=0.0, nesterov=False)
     model.compile(loss='binary_crossentropy',
                   #optimizer=sgd,
-                  optimizer='adam', #changed from rmsprop to adam
+                  optimizer=opt, #changed from rmsprop to adam
                   metrics=['accuracy'])
     
     train_data_dir = data_dir+'/train'
@@ -69,16 +63,14 @@ def create_CNN_model(data_dir):
     #test_data_dir = data_dir+'/test'
     nb_train_samples = sum([len(files) for r, d, files in os.walk(train_data_dir)])
     nb_validation_samples = sum([len(files) for r, d, files in os.walk(validation_data_dir)])
-    epochs = 10
+    epochs = 20
     batch_size = 25
     # this is the augmentation configuration we will use for training
-    train_datagen = ImageDataGenerator(
-            rescale = 1./255)
+    train_datagen = ImageDataGenerator(rescale = 1./255)
     
     # this is the augmentation configuration we will use for testing:
     # only rescaling
     validation_datagen = ImageDataGenerator(rescale=1./255)
-                                      #zca_whitening=False)
     
     train_generator = train_datagen.flow_from_directory(
         train_data_dir,
@@ -94,34 +86,33 @@ def create_CNN_model(data_dir):
     
     hist = model.fit_generator(
         train_generator,
-        steps_per_epoch=nb_train_samples // batch_size,
+        steps_per_epoch=nb_train_samples // batch_size, 
         epochs=epochs,
         validation_data=validation_generator,
         validation_steps=nb_validation_samples // batch_size)
     
     #print(hist.history)
-    #model.save('first_model.h5')
-    #model.save_weights('first_try.h5')
-    return hist, model, validation_generator, epochs
-
-
-def evaluate_CNN(hist, model, validation_generator):   
-    model.evaluate_generator(generator=validation_generator)
-    #Performance metrics
-    test_steps_per_epoch = np.math.ceil(validation_generator.samples / validation_generator.batch_size)
-    #Predicts the class based on the probability into array of arrays, in which the sub-array is the probability for each test image.
-    #Array shape=> [(test_size, 1)]
-    predictions = model.predict_generator(validation_generator,steps=test_steps_per_epoch)
-    #Reduces the array of arrays to array of size (test_size, 1) and the data type is float
-    predicted_class_indices=np.squeeze(predictions,axis=1) 
-    #Rounding of the probabilities to get the classes (but note that the classes are in float)
-    i=0
-    while(i<len(predicted_class_indices)):
-        predicted_class_indices[i] = round(predicted_class_indices[i])
-        i = i+1
-    predictions = predicted_class_indices.astype(int)
     accuracy = cal_acc(hist)
-    return predictions, accuracy
+    model.summary()
+    #You can use model.save(filepath) to save a Keras model at a particular location.
+    model.save(results_path+'model.h5')
+    model.save_weights(results_path+'weights.h5')
+    return hist, model, validation_generator, epochs, accuracy, data_dir, batch_size, img_height, img_width
+
+
+def evaluate_CNN(model, data_dir, batch_size, img_height, img_width):   
+    print("Evaluating")
+    test_data_dir = data_dir+'/test'
+    test_datagen = ImageDataGenerator(rescale=1./255)
+    test_generator = test_datagen.flow_from_directory(
+        test_data_dir,
+        target_size=(img_width, img_height),
+        batch_size=batch_size,
+        class_mode='binary')
+    #print(model.evaluate_generator(generator=test_generator))
+    score, acc = model.evaluate_generator(generator=test_generator)
+    print(score, acc)
+    return test_generator, score, acc
 
 
 def cal_acc(hist):
@@ -142,40 +133,29 @@ def cal_acc(hist):
     return accuracy
 
 
-def plot_acc(training_results, hist, epochs):
+def plot_acc(results_path, hist, epochs):
     plt.plot(hist.history['acc'])
     plt.plot(hist.history['val_acc'])
     plt.title('model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
-    plt.xlim(0, epochs-1) 
+    plt.ylim(0, 1.05)
+    plt.xlim(0, epochs-1)
     plt.legend(['train', 'validation'], loc='upper left')
     #It is very important to have savefig() before show().
-    plt.savefig(training_results+'accuracy.png')
+    plt.savefig(results_path+'training.png')
     plt.show()
 
 
-def save_results(accuracy, validation_generator, predictions, training_results):
+def save_results(accuracy, test_generator, score, acc, results_path):
     #Accuracy metrics
-    f_accuracy = open(training_results+"accuracy"+".csv","w")
+    f_accuracy = open(results_path+"training"+".csv","w")
     accuracy.to_csv(f_accuracy, index=False)
     f_accuracy.close()
     
-    #Confusion matrix
-    true_classes = validation_generator.classes
-    class_labels = list(validation_generator.class_indices.keys())
-    matrix = confusion_matrix(true_classes, predictions)
-    #print(matrix)
-    f_confusion_matrix = open(training_results+"confusion-matrix"+".csv",'w')
-    f_confusion_matrix.write(np.array2string(matrix, separator=', '))
-    f_confusion_matrix.close()
-    
-    #Results
-    result = classification_report(true_classes, predictions, target_names=class_labels)
-    #print(result) 
-    f_report = open(training_results+"report"+".rtf","w")
-    f_report.write(result)
-    f_report.close()
+    f_test_accuracy = open(results_path+"test"+".txt","w")
+    f_test_accuracy.write("Test loss is: "+str(acc)+"\nTest accuracy is: ")
+    f_test_accuracy.close()
 
 
 def main():
@@ -183,22 +163,27 @@ def main():
     startTime = time.clock()
     print("Process started")
     print("---------------")
-    results_path = ('C:\\Users\\svissa1\\Documents\\research\\results\\training\\')
-    #Make directory for results
-    current_time = get_time()
-    training_results = results_path+'training_results'+"_"+current_time+ "\\"
-    os.makedirs(training_results)
+    first_layer_nodes = 1
+    second_layer_nodes = 2
+    third_layer_nodes = 1
+    if_third_layer = 'F'
+    opt = 'rmsprop' 
     #Gets the input directory.
     data_dir = get_input_dir()
     print("data_dir: "+data_dir)
+    #Determines the output directory
+    results_path = os.path.dirname(data_dir) #parent directory
+    #Make directory for results
+    results_path = results_path+"\\results\\"
+    os.makedirs(results_path)
     #Creates the model and saves it.
-    hist, model, validation_generator, epochs = create_CNN_model(data_dir)
+    hist, model, validation_generator, epochs, accuracy, data_dir, batch_size, img_height, img_width = create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_nodes,if_third_layer,opt,results_path)
     #Evaluates the created model.
-    predictions, accuracy = evaluate_CNN(hist, model, validation_generator)
+    score, acc, test_generator = evaluate_CNN(model, data_dir, batch_size, img_height, img_width)
     #Plots the model accuracies.
-    plot_acc(training_results, hist, epochs)
+    plot_acc(results_path, hist, epochs)
     #Saves the results in appropriate files.
-    save_results(accuracy, validation_generator, predictions, training_results)
+    save_results(accuracy, test_generator, score, acc, results_path)
 
     endtime = time.clock()
     timeElapsed = endtime - startTime
