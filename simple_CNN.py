@@ -46,7 +46,7 @@ def create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_n
         model.add(MaxPooling2D(pool_size=(2, 2)))
     
     model.add(Flatten())
-    model.add(Dense(16))
+    model.add(Dense(32))
     model.add(Activation('relu')) 
     model.add(Dropout(0.5))
     model.add(Dense(1))
@@ -63,7 +63,7 @@ def create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_n
     #test_data_dir = data_dir+'/test'
     nb_train_samples = sum([len(files) for r, d, files in os.walk(train_data_dir)])
     nb_validation_samples = sum([len(files) for r, d, files in os.walk(validation_data_dir)])
-    epochs = 20
+    epochs = 1
     batch_size = 25
     # this is the augmentation configuration we will use for training
     train_datagen = ImageDataGenerator(rescale = 1./255)
@@ -110,9 +110,10 @@ def evaluate_CNN(model, data_dir, batch_size, img_height, img_width):
         batch_size=batch_size,
         class_mode='binary')
     #print(model.evaluate_generator(generator=test_generator))
-    score, acc = model.evaluate_generator(generator=test_generator)
-    print(score, acc)
-    return test_generator, score, acc
+    loss, acc = model.evaluate_generator(generator=test_generator)
+    print("loss:",str(loss))
+    print("acc:",str(acc))
+    return loss, acc, test_generator
 
 
 def cal_acc(hist):
@@ -147,14 +148,15 @@ def plot_acc(results_path, hist, epochs):
     plt.show()
 
 
-def save_results(accuracy, test_generator, score, acc, results_path):
+def save_results(accuracy, test_generator, loss, acc, results_path):
     #Accuracy metrics
     f_accuracy = open(results_path+"training"+".csv","w")
     accuracy.to_csv(f_accuracy, index=False)
     f_accuracy.close()
     
     f_test_accuracy = open(results_path+"test"+".txt","w")
-    f_test_accuracy.write("Test loss is: "+str(acc)+"\nTest accuracy is: ")
+    f_test_accuracy.write("Test loss is: "+str(loss))
+    f_test_accuracy.write("\nTest accuracy is: "+str(acc))
     f_test_accuracy.close()
 
 
@@ -163,8 +165,8 @@ def main():
     startTime = time.clock()
     print("Process started")
     print("---------------")
-    first_layer_nodes = 1
-    second_layer_nodes = 2
+    first_layer_nodes = 8
+    second_layer_nodes = 8
     third_layer_nodes = 1
     if_third_layer = 'F'
     opt = 'rmsprop' 
@@ -179,11 +181,11 @@ def main():
     #Creates the model and saves it.
     hist, model, validation_generator, epochs, accuracy, data_dir, batch_size, img_height, img_width = create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_nodes,if_third_layer,opt,results_path)
     #Evaluates the created model.
-    score, acc, test_generator = evaluate_CNN(model, data_dir, batch_size, img_height, img_width)
+    loss, acc, test_generator = evaluate_CNN(model, data_dir, batch_size, img_height, img_width)
     #Plots the model accuracies.
     plot_acc(results_path, hist, epochs)
     #Saves the results in appropriate files.
-    save_results(accuracy, test_generator, score, acc, results_path)
+    save_results(accuracy, test_generator, loss, acc, results_path)
 
     endtime = time.clock()
     timeElapsed = endtime - startTime
