@@ -57,7 +57,7 @@ for folder in input_folders:
        #Sorting the filenames.
        filenames.sort()
        #Randomizing the order of the filenames.
-       random.seed(234)
+       random.seed(random.randint(1,1000))
        random.shuffle(filenames)
        for image in filenames:#os.listdir(current_input_folder):
            im = current_input_folder+'/'+image
