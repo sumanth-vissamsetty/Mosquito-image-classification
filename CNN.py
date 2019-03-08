@@ -63,7 +63,7 @@ def create_CNN_model(data_dir,first_layer_nodes,second_layer_nodes,third_layer_n
     #test_data_dir = data_dir+'/test'
     nb_train_samples = sum([len(files) for r, d, files in os.walk(train_data_dir)])
     nb_validation_samples = sum([len(files) for r, d, files in os.walk(validation_data_dir)])
-    epochs = 1
+    epochs = 10
     batch_size = 25
     # this is the augmentation configuration we will use for training
     train_datagen = ImageDataGenerator(rescale = 1./255)
